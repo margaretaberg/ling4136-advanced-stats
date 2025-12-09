@@ -1,0 +1,15 @@
+Code book of of mcu_box_office_class.csv
+
+Dataset curated from sources online on ratings, revenue and costs of mcu movies.
+
+Variables:
+
+movie_title: movie title
+mcu_phase: which phase does the movie belong to according to marvel (1-5)
+relase_date: cinematic release
+tomato_meter: tomato_meter score from rottentomatoes.com
+audience_score: popcornmeter from rottentomatoes.com
+movie_duration: duration of movie in minutes
+production_budget: production budget in US $
+opening_weekend: box office revenue at opening weekend in US $ corrected for inflation in 2023.
+worldwide_box_office: gross box office revenue worldwide in US $ corrected for inflation in 2023.

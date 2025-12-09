@@ -1,0 +1,236 @@
+---
+title: "session01 - exercises - solutions"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, performance, modelr)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Introduction
+
+The main **learning goals** of this week's practical parts are:
+
+-   remembering coefficient interpretations of linear models
+-   remembering how to interpret p-values
+-   remembering how to plot model predictions
+
+# Exercise 1
+
+### Introduction to data
+
+We will work with a dataset which takes the form of a hypothetical experiment where L2 learners of a fictional language called Quantese completed a picture naming task. The participants sat down and were shown a series of pictures containing objects, and had to name the object in Quantese as quickly and as accurately as possible. In each trial, we measured how long it took participants to respond (`rt`) and whether or not the word they supplied matched the picture or not (`ACC`).
+
+These are the variables that you will find within the data:
+
+-   `age_yrs`: participant’s age in years at time of testing
+-   `age_of_onset`: participant’s age in years when they started learning Quantese
+-   `Condition`: whether the word was Simple or Complex
+-   `log_frequency`: the log-transformed frequency count of the word
+-   `ACC`: whether response was accurate (1) or inaccurate (0)
+-   `rt`: the reaction time in milliseconds
+-   `PartID`: the participant ID number
+-   `ItemID`: the item ID number
+
+Let's have a look: 
+
+```{r}
+#| label: load-quantese
+
+quantese <- read_csv("../data/quantese_naming_sim.csv") 
+
+quantese
+
+```
+
+### (A) run linear model
+
+Imagine, the researchers wanted to test the following hypotheses:
+
+*"We hypothesize that reaction times are affected by lexical frequency"*
+
+Run an appropriate model to test this hypothesis.
+
+```{r}
+#| label: lm_quantese
+
+# we first transform rt into log(rt) because we know that rt distributions usually have a thick right tale
+quantese <- quantese |> 
+  mutate(log_rt = log(rt))
+
+# simple linear model
+quant_lm <- lm(log_rt ~ log_frequency, 
+               data = quantese)
+
+# print summary
+summary(quant_lm)
+
+# Interpretation: 
+# Intercept: When log_frequency is 0, estimated log(RT) is 6.7 ms
+# For each additional unit of log_frequency, estimated log(RT) decreases by 0.06. This effect is significant at an alpha level of 0.05, i.e. when assuming the null-hypothesis (i.e. the effect of log_frequency is zero), the observed t-value or more extreme t-values (=< -22.4) are sufficiently improbable (p > 0.0001) such that we can reject the null hypothesis.
+
+```
+
+### (B) plot predictions
+Plot the model predictions alongside a measure of uncertainty (standard error or 95% CI). If you can, plot the model predictions on top of the raw data. 
+
+```{r}
+#| label: plot_prediction_quantese
+
+# create a new dataset for predictions
+new_data_quantese <- expand_grid(log_frequency = seq(from = 1,
+                                                     to = 6, 
+                                                     by = 0.05))
+
+# add predictions to that data set
+predictions <- predict(quant_lm,
+                       newdata = new_data_quantese,
+                       # and we also predict uncertainty based on SEs
+                       se.fit = TRUE)
+
+# add both model estimates and SEs to new_data
+new_data_quantese <- new_data_quantese |> 
+  mutate(model_estimate = predictions$fit,
+         model_SE = predictions$se.fit,
+         # transform into 95% confidence intervals
+         model_lower95CI = model_estimate - 1.96*model_SE,
+         model_upper95CI = model_estimate + 1.96*model_SE)
+
+# plot 
+plot_pred <- 
+  ggplot(data = new_data_quantese, 
+       aes(x = log_frequency,
+          y = model_estimate)
+      ) +
+  # plot uncertainty as a ribbon
+  geom_ribbon(data = new_data_quantese,
+             aes(ymin = model_lower95CI,
+                 ymax = model_upper95CI),
+             color = NA,
+             alpha = 0.2) +
+  # plot model estimates
+  geom_line(size = 2) +
+  # titles
+  labs(title = "Model estimates for log(RTs) as a function of lexical frequency",
+       subtitle = "error ribbons represent 95% confidence intervals",
+       y = "log(reaction times)\n",
+       x = "\nlog(lexical frequency)") +
+  theme_minimal()
+
+plot_pred
+
+# add data
+plot_pred + 
+  geom_point(data = quantese,
+             aes(x = log_frequency,
+                 y = log_rt),
+             alpha = 0.1)
+
+```
+
+### (C) evaluate consistency of effect
+
+But hold on a minute. These observations are not independent. Each participant produced many responses, and each item was produced by man participants. The linear model provides an average estimate for the group. However, the researchers want to ensure this pattern is generalizable to different participants. Can you visualize the change in reaction times as a function of lexical frequency for every participant. Briefly interpret your plots: Do most individuals show the same pattern as the group average? Compare both their overall reaction times and how reaction times differ as a function of lexical frequency.
+
+```{r}
+#| label: participant_variation
+
+# plot
+ggplot(data = quantese, 
+       aes(x = log_frequency,
+           y = log_rt)
+      ) +
+  # plot line for each participant's raw data
+  # geom_line(aes(group = PartID),
+  #           size = 1,
+  #           alpha = 0.3) +
+  # alternatively you could run a smooth through the raw data
+  geom_smooth(method = "lm",
+              se = FALSE,
+              colour = alpha("black", 0.3)) +
+  # plot model estimates
+  geom_line(data = new_data_quantese,
+            aes(x = log_frequency,
+                y = model_estimate),
+            colour = "red",
+            size = 1) +
+  facet_wrap(~ PartID) +
+  labs(title = "Model estimates for all (red) vs. smooths for individual subjects (grey)",
+       y = "log (reaction times in ms)\n",
+       x = "\nlog(lexical frequency)") +
+  theme_minimal()
+
+# Answer: There is substantial variability across participants. Clearly, participants differ in their overall speed (e.g. compare slow 20 with fast 47). Moreover it appears as if the effect of frequency differs across participants. For example subject 19 seems to have barely any frequency effect, while 42 seems to show a stronger effect.
+
+# I wish we had a way to account for this variation in our model...
+
+```
+
+# Exercise 2
+
+Imagine, the researchers wanted to also test the following hypotheses:
+
+*"We hypothesize that accuracy is affected by lexical frequency."*
+
+Follow the workflow above and 
+
+### (A) run a logistic regression
+
+Run an appropriate model to test the hypothesis.
+
+```{r}
+#| label: glm_quantese
+
+# YOUR CODE HERE
+
+```
+
+### (B) plot predictions
+Plot the model predictions alongside a measure of uncertainty (e.g. standard error or 95% CI).
+
+```{r plot_glm_prediction_quantese}
+#| label: plot_glm_prediction_quantese
+
+# YOUR CODE HERE
+
+```
+
+### (C) evaluate consistency of effect
+
+But hold on a minute. These observations are not independent. Each participant produced many responses, and each item was produced by man participants. The linear model provides an average estimate for the group. However, the researchers want to ensure this pattern is generalizable to different participants. Can you visualize the change in reaction times as a function of lexical frequency for every participant. Briefly interpret your plots: Do most individuals show the same pattern as the group average? Compare both their overall reaction times and how reaction times differ as a function of lexical frequency.
+
+```{r}
+#| label: participant_acc_variation
+
+# YOUR CODE HERE
+
+```

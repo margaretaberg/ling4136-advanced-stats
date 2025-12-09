@@ -1,0 +1,21 @@
+Code book of of quantese_naming_sim.csv
+
+These data are simulated and loosely based on the literature on L2 picture naming tasks.
+
+Variables:
+
+age_yrs: participant’s age in years at time of testing (numerical)
+
+age_of_onset: participant’s age in years when they started learning Quantese (numerical)
+
+Condition: whether the word was Simple or Complex (categorical)
+
+log_frequency: the log-transformed frequency count of the word (numerical)
+
+ACC: whether response was accurate (1) or inaccurate (0) (binary)
+
+rt: the reaction time in milliseconds (numerical)
+
+PartID: the participant ID number
+
+ItemID: the item ID number

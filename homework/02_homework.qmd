@@ -1,0 +1,103 @@
+---
+title: "session02 - homework"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, afex)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Exercise 1
+
+### Introduction to data
+
+We will be working with Quantese again, see `01_exercise.qmd` and the other data resources for a refresher. 
+
+```{r}
+#| label: load-quantese
+
+quantese <- read_csv("../../data/quantese_naming_sim.csv") 
+
+# add log-transformed reaction time
+quantese <- quantese |> 
+  mutate(log_rt = log(rt))
+
+# have a look
+quantese
+
+```
+
+### (A) check the design and formualte a linear mixed effects model
+
+Imagine, the researchers wanted to test the following hypotheses:
+
+*"We hypothesize that log-transformed reaction times are affected by lexical frequency"*
+
+Run an appropriate linear mixed effects model to test this hypothesis. 
+If you run into convergence issues, deal with them as you see fit.
+
+```{r}
+#| label: lmer_quantese
+
+
+# YOUR CODE HERE
+
+```
+
+### (B) interpret the model output
+
+Take your selected model, interpret the model coefficients and calculate p-values for the relevant predictor. 
+
+```{r}
+#| label: lmer_quantese
+
+# YOUR CODE HERE
+# YOUR ANSWER HERE
+
+```
+
+### (C) Optional: plot predictions
+
+Plot the model predictions alongside a measure of uncertainty (standard error or 95% CI). If you can, plot the model predictions on top of the raw data. 
+
+Tip: You have to set `re.form = NA` if you use the `predict()` function:
+
+```{r}
+#| label: plot_prediction_quantese
+
+# YOUR CODE HERE
+
+```
+
+### (D) write up results
+
++++YOUR ANSWER HERE+++

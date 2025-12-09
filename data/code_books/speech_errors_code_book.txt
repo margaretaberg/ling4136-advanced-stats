@@ -1,0 +1,8 @@
+Code book of of speech_errors.csv
+
+Simulated fictitious data set.
+
+Variables:
+
+blood _alcohol: Blood alcohol level (numerical)
+speech_error: presence (1) or absence of a speech error (0) (binary)

@@ -1,0 +1,11 @@
+Code book of of Winter_timeline.csv
+
+Original article: “Winter and Duffy Can Co-Speech Gestures Alone Carry the Mental Time Line.pdf”
+
+Variables:
+
+Gesture: whether a forward or backward gesture is made
+
+Language: whether the word "forward" or "backward" was used
+
+Response: the response of participants.

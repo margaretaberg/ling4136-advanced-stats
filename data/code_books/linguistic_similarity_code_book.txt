@@ -1,0 +1,11 @@
+Code book of of linguistic_similarity.csv
+
+Original article: “Winter and Matlock (2013) similarity is proximity.pdf”
+
+Variables:
+
+Sem: whether the cities were described as semantically similar or different (categorical)
+
+Phon: whether the cities were named with phonologically similar or different names (categorical)
+
+Distance: The distance between cities drawn onto the map in millimeters

@@ -1,0 +1,180 @@
+---
+title: "session02 - exercises - solutions"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, afex)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Introduction
+
+The main **learning goals** of this week's practical parts are:
+
+-   getting familiar with identifying random effects
+-   learning how to specify linear mixed effects models
+-   learning how to deal with convergence issues
+-   learning how to generate p-values for linear mixed effects models
+
+# The data
+
+In this dataset, we will be analyzing data from the following paper:
+
+Winter & Grawunder. 2012. The phonetic profile of Korean formal and informal speech registers, Journal of Phonetics 40(6). 808-815. https://doi.org/10.1016/j.wocn.2012.08.006
+
+In a nutshell, the authors were interested in the acoustic profile of politeness in Korean. Specifically here, they wonder whether formal `contexts` elicit higher or lower `pitch` than informal ones.
+
+Let's have a look at the data:
+
+```{r}
+#| label: load-politeness
+
+# Load in the dataset:
+polite <- read_csv('../data/winter_politeness.csv')
+
+# check data set:
+polite
+
+```
+
+These are the variables that you will find within the data:
+
+-   `subject`: a unique identifier for participants
+-   `gender`: participants' sex (only female vs. male)
+-   `sentence`: a unique identifier for different stimuli sentences
+-   `context`: the social context (formal vs. informal)
+-   `pitch`: mean fundamental frequency in Hz
+
+# Exercise 1
+
+### (a) checking the design
+
+At the beginning of any analysis it is a good idea to familiarize yourself with the structure of the data. Let's check how many `subject`s there are, as well as how many data points we have per subject
+
+```{r}
+#| label: check-design-subj
+
+# number of participants:
+polite |> count(subject)
+
+```
+
+Looks very tidy. This data frame has 16 rows, which means there were 16 subjects. Each subject is associated with 14 data points.
+
+In the following code chunk, adapt the above code to count how many items (`sentence`) there are. How many data points do you have for these groups?
+
+```{r}
+#| label: check-design-items
+
+# YOUR CODE HERE
+
+```
+
+### (b) descriptive distributions
+
+Next, let's create some descriptive summaries and some visualizations for the `pitch` variable (our dependent variable).
+
+First, calculate the overall average pitch (since there are some NA's we need to tell R to ignore them)
+
+```{r}
+#| label: average
+
+# YOUR CODE HERE
+
+```
+
+Now, compute pitch averages per `subject` and `gender`. Hint: For this, you will need to add `group_by()`.
+
+```{r}
+#| label: average-2
+
+# YOUR CODE HERE
+
+```
+
+Now plot the distributions of pitch for all combinations of the two `context`s and `gender.`
+
+```{r}
+#| label: distributions
+
+# YOUR CODE HERE
+  
+```
+
+### (c) thinking about a model and building it
+
+O.k., so here we are: warmed up and somewhat familiar with the dataset. This is where the *thinking* starts. We would like to test the following hypothesis:
+
+*Korean speakers modulate their voice pitch as a function of social context.*
+
+Perhaps the two most important questions right now are:
+
+-   How do you assume the response to be distributed, i.e., what type of GLM do you need? (linear model, logistic model, etc.)
+-   What predictors are relevant to test this hypothesis?
+-   Are there non-independent data points?
+
+If so, what are the grouping variables? If you determine that there are non-independencies to be controlled for, you would need a mixed model.
+
+YOU decide what model you want to fit in this session.
+
+Some of these models may not converge! (And we will discuss that).
+
+```{r}
+#| label: lmers
+
+# YOUR CODE HERE
+
+```
+
+### (d) variation across grouping variables
+
+Make a graph that visualize how the difference between formal and informal context affects pitch across subjects and sentences.
+
+```{r}
+#| label: vis-subjects
+
+# YOUR CODE HERE
+
+```
+
+### (e) calculate p-values and write up your analysis
+
+Now, in simple linear models, the model output gave us these p-values conveniently. For linear mixed effects models, we generate p-values slightly differently. What we do is, we compare our model *with* the relevant parameter (here `context`) to the exact same model *without the relevant parameter*. Recruit Winter (2013)'s tutorial and find a way to run such a model comparison using Likelihood Ratio Tests.
+
+```{r}
+#| label: likelihood-ratio-tests
+
+# YOUR CODE HERE
+
+```
+
+YOUR WRITE-UP HERE

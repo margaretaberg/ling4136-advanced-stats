@@ -1,0 +1,328 @@
+---
+title: "session02 - exercises - solutions"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, afex)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Introduction
+
+The main **learning goals** of this week's practical parts are:
+
+-   getting familiar with identifying random effects
+-   learning how to specify linear mixed effects models
+-   learning how to deal with convergence issues
+-   learning how to generate p-values for linear mixed effects models
+
+# The data
+
+In this dataset, we will be analyzing data from the following paper:
+
+Winter & Grawunder. 2012. The phonetic profile of Korean formal and informal speech registers, Journal of Phonetics 40(6). 808-815. https://doi.org/10.1016/j.wocn.2012.08.006
+
+In a nutshell, the authors were interested in the acoustic profile of politeness in Korean. Specifically here, they wonder whether formal `contexts` elicit higher or lower `pitch` than informal ones.
+
+Let's have a look at the data:
+
+```{r}
+#| label: load-politeness
+
+# Load in the dataset:
+polite <- read_csv('../../data/winter_politeness.csv')
+
+# check data set:
+polite
+
+```
+
+These are the variables that you will find within the data:
+
+-   `subject`: a unique identifier for participants
+-   `gender`: participants' sex (only female vs. male)
+-   `sentence`: a unique identifier for different stimuli sentences
+-   `context`: the social context (formal vs. informal)
+-   `pitch`: mean fundamental frequency in Hz
+
+# Exercise 1
+
+### (a) checking the design
+
+At the beginning of any analysis it is a good idea to familiarize yourself with the structure of the data. Let's check how many `subject`s there are, as well as how many data points we have per subject
+
+```{r}
+#| label: check-design-subj
+
+# number of participants:
+polite |> count(subject)
+
+```
+
+Looks very tidy. This data frame has 16 rows, which means there were 16 subjects. Each subject is associated with 14 data points.
+
+In the following code chunk, adapt the above code to count how many items (`sentence`) there are. How many data points do you have for these groups?
+
+```{r}
+#| label: check-design-items
+
+# number of sentences:
+polite |> count(sentence)
+
+# 7 sentences with 32 observatins per sentence
+
+```
+
+### (b) descriptive distributions
+
+Next, let's create some descriptive summaries and some visualizations for the `pitch` variable (our dependent variable).
+
+First, calculate the overall average pitch (since there are some NA's we need to tell R to ignore them)
+
+```{r}
+#| label: average
+
+polite |> 
+  summarize(M = mean(pitch, na.rm = TRUE))
+
+```
+
+The average pitch is 198 Hz. Great.
+
+Now, compute pitch averages per `subject` and `gender`. Hint: For this, you will need to add `group_by()`.
+
+```{r}
+#| label: average-2
+
+# per-subject average 
+polite |> 
+  group_by(subject) |> 
+  summarize(M = mean(pitch, na.rm = TRUE))
+
+# per-gender category average 
+polite |> 
+  group_by(gender) |> 
+  summarize(M = mean(pitch, na.rm = TRUE))
+
+```
+
+Of course, male and female speakers have completely different pitch values. Good to keep in mind.
+
+Now plot the distributions of pitch for all combinations of the two `context`s and `gender.`
+
+```{r}
+#| label: distributions
+
+# Per-subject average 
+polite |> 
+  ggplot(aes(x = pitch,
+             fill = context)) +
+  geom_density(alpha = 0.3) +
+  facet_grid(context~gender) +
+  theme_minimal()
+  
+```
+
+Looks like there might be a slight shift of the distributions towards high pitch values for informal contexts, but it is certainly dwarfed by the huge effect of gender.
+
+### (c) thinking about a model and building it
+
+O.k., so here we are: warmed up and somewhat familiar with the dataset. This is where the *thinking* starts. We would like to test the following hypothesis:
+
+*Korean speakers modulate their voice pitch as a function of social context.*
+
+Perhaps the two most important questions right now are:
+
+-   How do you assume the response to be distributed, i.e., what type of GLM do you need? (linear model, logistic model, etc.)
+-   What predictors are relevant to test this hypothesis?
+-   Are there non-independent data points?
+
+If so, what are the grouping variables? If you determine that there are non-independencies to be controlled for, you would need a mixed model.
+
+YOU decide what model you want to fit in this session.
+
+Some of these models may not converge! (And we will discuss that).
+
+```{r}
+#| label: lmers
+
+# Since we want to predict the mean pitch for informal and formal contexts, we want to run a linear regression on the pitch column. Since we know participants' sex plays a large role too, we add it to the model
+
+xmdl_simple <- lm(pitch ~ context + gender,
+                  data = polite)
+
+# but there seem to be two clusters of dependencies in the data: the context effect differs across speakers and sentence. So it is reasonable to assume that pitch generally differs across the grouping variables (i.e. some speakers have higher pitch than others). We account for that by adding random intercepts: 
+
+xmdl_r_interc <- lmer(pitch ~ context + gender +
+                        (1 | subject) +
+                        (1 | sentence),
+                       data = polite)
+
+# but it could be that different speakers/sentences show different effects of context. Let us first check the context effect is a within-subject / within-sentence variable, i.e. one and the same speaker produces speech in both informal and formal contexts and one and the same sentences is used in both these conditions.
+
+# for subjects
+table(polite$subject, polite$context)
+
+# for sentences
+table(polite$sentence, polite$context)
+
+# yes to both. So we should allow the context effect to vary within these two grouping variables by using random slopes
+
+xmdl_r_slopes <- lmer(pitch ~ context + gender +
+                        (1 + context | subject) +
+                        (1 + context | sentence),
+                       data = polite)
+
+# note to ourselves: the final model throws a warning: "boundary (singular) fit: see help('isSingular')"
+
+```
+
+The final model does not converge (surprise!). Run `help('isSingular')` to learn more about this warning, but bottom line is:\
+we should not trust its estimates. What to do? One strategy that is sometimes recommended and often implemented is reducing the random slope complexity.
+
+We start by removing one random slope over time. As a rule of thumb, variability across subjects is often much higher than across items, so a good point of departure is removing the slope for `sentences`:
+
+```{r}
+#| label: reduce-reffects
+
+xmdl_r_slopes_red1 <- lmer(pitch ~ context + gender +
+                             (1 + context | subject) +
+                             # instead of a random slope we use only a random intercept
+                             (1 | sentence),
+                           data = polite)
+
+# Still does not converge. 
+# What if we remove the random slope for subjects instead
+
+xmdl_r_slopes_red2 <- lmer(pitch ~ context  + gender + 
+                             (1 | subject) +
+                             # instead of a random slope we use only a random intercept
+                             (1 + context | sentence),
+                           data = polite)
+# Now the model converges.
+# That is good.
+# However it is clearly anti-conservative as it does not account for important dependencies. 
+# For now, we have to live with that. 
+
+```
+
+### (d) variation across grouping variables
+
+Now we have three different models with different complexity. Let us gain an intuition about what that means for the uncertainty around the estimates.
+
+```{r}
+#| label: compare-models
+
+summary(xmdl_simple) # standard error of context coefficient is 5.3
+summary(xmdl_r_interc) # standard error of context coefficient is 4.1
+summary(xmdl_r_slopes_red2) # standard error of context coefficient is 5.7
+
+```
+
+What we can see is that the coefficient itself remains very similar, but the uncertainty around this estimate changes: adding random intercept generally helps the model identifying the effect of context because it allows to account for variance associated with different participants and items; adding random slopes on the other hand introduces more uncertainty because sentences differ in how context affects pitch. This is concerning because the model with a random slope for subjects did not converge.
+
+Make a graph that visualize how the difference between formal and informal context affects pitch across subjects and sentences.
+
+```{r}
+#| label: vis-subjects
+
+# aggregate pitch over subjects
+polite_subj <- polite |> 
+  group_by(subject, context) |> 
+  summarise(mean_pitch = mean(pitch, na.rm = TRUE))
+
+# aggregate pitch over sentences
+polite_items <- polite |> 
+  group_by(sentence, context) |> 
+  summarise(mean_pitch = mean(pitch, na.rm = TRUE))
+
+
+# plot subjects
+polite_subj |> 
+  ggplot(aes(x = mean_pitch, 
+             y = context,
+             colour = context,
+             label = subject,
+             group = subject)) +
+  geom_line(colour = "grey") +
+  geom_label(size = 4) +
+  theme_minimal()+
+  theme(legend.position = "none")
+
+# plot sentences
+polite_items |> 
+  ggplot(aes(x = mean_pitch, 
+             y = context,
+             colour = context,
+             label = sentence,
+             group = sentence)) +
+  geom_line(colour = "grey") +
+  geom_label(size = 4) +
+  theme_minimal()+
+  theme(legend.position = "none")
+
+```
+
+As it turns out, there is substantial variation across sentences with S5 for example showing the opposite pattern than the rest and with S3 showing a extremely strong context effect. Subjects also differ with for example M4 and F7 showing a weak effect in the opposite direction. Overall it would be important to account for this variation in our model.
+
+Unfortunately the "maximal" model that also included by-subject random slopes did not converge.
+
+### (e) calculate p-values and write up your analysis
+
+We use the maximal model that converges and would like to generate a p-value for the relevant effect of context, right. Now, in simple linear models, the model output gave us these p-values conveniently. For linear mixed effects models, we generate p-values slightly differently. What we do is, we compare our model *with* the relevant parameter (here `context`) to the exact same model *without the relevant parameter*.
+
+The `afex` package does that for us conveniently:
+
+```{r}
+#| label: likelihood-ratio-tests
+
+# To perform likelihood ratio tests with afex:
+xmdl.afex <- mixed(pitch ~ context + gender + 
+                           (1 | subject) +
+                           # instead of a random slope we use only a random intercept
+                           (1 + context | sentence),
+                           data = polite, 
+                   check_contrasts = FALSE,
+                   method = 'LRT')
+xmdl.afex
+
+# Given the model comparison, we would conclude that, given the model and the data, the observed effect of context is significant at an alpha level of 0.05, i.e. the observed or more extreme test statistics are sufficiently improbable (p = 0.02) to reject the null hypothesis.
+
+```
+
+When writing up the results, you want to indicate several indices: the Chi square value, the degree of freedom (df), the coefficient of your critical predictor and the p-value. So here we would add the following to our description of the results: χ2(df = 1) = 5.45, beta = 15, p = 0.02.
+
+Writing the whole thing up could look something like this:
+
+All data were analyzed with linear mixed models, using R (R Core Team, 2025) and the package lme4 (Bates, Maechler & Bolker, 2012) assuming a Gaussian error distribution. The model predicted pitch in Hz by context (formal vs. informal) and self-reported gender of participants (male vs. female). We included random intercepts and by-participant and by-sentence random slopes for the critical predictor context. This model did not converge, thus we removed the by-participant random slope to achieve model convergence. Using this model, we calculated p-values with likelihood ratio tests comparing the full model against a null model (i.e. the model that does not include the critical predictor context)
+
+The model estimated that informal contexts had 15 Hz higher pitch than formal contexts (SE = 5.7). This effect was significant at an alpha level of 0.05. Thus, assuming that the context effect is zero, the test statistics or more extreme test statistics are sufficiently improbable to reject the null hypothesis (χ2(1) = 5.45, p = 0.02). However, given that the final model does not account for by-subject variability for the critical context effect, the model has to be considered anti-conservative and the inferential conclusion has to be taken with caution.

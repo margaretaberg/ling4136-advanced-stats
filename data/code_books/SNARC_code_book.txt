@@ -1,0 +1,17 @@
+Code book of of snarc_nuerk05.csv
+
+Original article: “Nuerk et al (2005). The Universal SNARC Effect.pdf”
+
+Variables:
+
+subject: a unique participant identity
+
+trial.no: trial number, i.e. which observation in the experiment (1-200)
+
+number: one of 10 stimuli. Numbers 0-9.
+
+hand: the hand with which the correct answer had to be given (right or left)
+
+RT: reaction time in milliseconds
+
+correct: whether the response was correct (1) or not (0)

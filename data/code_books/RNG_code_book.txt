@@ -1,0 +1,15 @@
+Code book of of RNG_original.csv
+
+Original article: “Villani et al (2025) Open hands, large numbers.pdf”
+
+Variables:
+
+subject: a unique identifier for participants
+
+language`: what language the participant spoke (categorical: German vs. Norwegian)
+
+movement`: the nature of the gesture accompanying the random number generation (categorical: outwards, inwards)
+
+number: the number generated (numeric, 1-30)
+
+trial: the trial number, i.e. which position in the experimental sequence (numeric, 1-110)
