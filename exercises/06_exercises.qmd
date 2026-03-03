@@ -35,7 +35,7 @@ run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocument
 run_if_not_knitting(setwd(current_working_dir))
 
 # options to increase efficiency of brms models (optional)
-#options(brms.backend = "cmdstanr")
+options(brms.backend = "cmdstanr")
 options(mc.cores = parallel::detectCores())
 
 ```
@@ -171,7 +171,7 @@ uniform_prior
 
 ```
 
-Next, we can fit a Bayesian model — we'll skip over a lot here in terms of how this model is estimated (using MCMC) but in order to model a simple mean, all we need to do in `brms` is to specify an intercept only model just as we did above and use the function `brm()`.
+Next, we can fit a Bayesian model --- we'll skip over a lot here in terms of how this model is estimated (using MCMC) but in order to model a simple mean, all we need to do in `brms` is to specify an intercept only model just as we did above and use the function `brm()`.
 
 ```{r}
 #| label: fit_uniform_prior_mdl
@@ -361,7 +361,7 @@ This is a table containing the samples that approximate the posterior distributi
 ```{r}
 #| label: visualize_posterior
 
-wide_prior_mdl |> 
+uniform_prior_mdl |> 
   spread_draws(b_Intercept) |> 
   ggplot(aes(x = b_Intercept)) +
   stat_halfeye(fill = 'darkorchid3')
