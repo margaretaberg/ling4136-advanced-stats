@@ -65,8 +65,10 @@ Let's visualize the raw `Distance` distribution for both `Sem` categories making
 ## Hi! Just a quick note at the beginning. When trying to commit to github, all the changes I had made somehow dissappeared. I have tried to add everything back, but I'm not really sure how good it is at this point. So sorry about that in advance. 
 
 sim %>%
-  ggplot(aes(x = Distance)) +
+  ggplot(aes(x = Distance, fill = Sem)) +
   geom_density(fill = 'darkseagreen') +
+  #Timo's addition
+  facet_grid(.~Sem)+
   theme_minimal()
 
 # Most values seem to be between around 50 and 100. It seems like some have placed the two cities almost right next to each other, around 0 in distance, and there is a slight increase in placements between 150 and 175. I am unaware of the maximum possible distance, but it seems like few of the participants placed the cities as far away from each other as possible. The peak is taller than I had expected, which indicates that a larger portion of the reponses map a distance between 25 and 100. What we see in this plot can be a result of how the map looks, or show other things affecting the data (for instance assumptions made by participants that the map provided would be centered around the cities, real-world knowledge that cities often can be located near water, etc.) 
@@ -108,6 +110,9 @@ Ignore for now that you might generate values that are impossible at the tails o
 plot_normal(mean = 74, sd = 3) +
   xlim(0,214)
 
+#Timos plot
+plot_normal(107,50)
+
 #Trying one verion where I calculate the mean and sd
 sim |> 
   summarize(M = mean(Distance, na.rm = TRUE),
@@ -128,8 +133,12 @@ Now based on your exploration, specify priors. Remember what the two coefficient
 #| label: spec_priors
 
 my_priors <- c(prior(normal(77.6, 40.1), class = 'Intercept'),
-                  prior(normal(77.6, 40.1), class = 'b'),
-                   prior(normal(0, 10), class = 'sigma'))
+                  prior(normal(77.6, 40.1), class = 'b', coef = 'SemSimilar')
+               # Timo lazy   , prior(normal(0, 10), class = 'sigma'))
+              )
+#Timos priors
+my_priors <- c(prior(normal(107, 50), class = 'Intercept'),
+               prior(normal(0, 50), class = 'b', coef = 'SemSimilar'))
 
 
 my_priors
@@ -232,6 +241,10 @@ Describe whether the data (dark line) and the posterior samples (light blue line
 pp_check(xmdl, ndraws = 100)
 
 # The data and posteriors are not a complete match. The actual data has a more "jagged" curve, with more variance between 100 and 200, and is steeper than the posterior samples. I don't know how good a fit it needs to be, but it seems like the posterior samples does not quite represent the density of the data at around 75, and shows more even slopes.
+
+# In class
+# Comparing light blue to dark blue
+# We assume a normal distribution, which the data does not show exactly, optionally, can we fix it
 
 
 ```
