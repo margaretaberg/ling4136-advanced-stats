@@ -1,0 +1,279 @@
+---
+title: "session08 - homework"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: true
+bibliography: ../resources/bibliography.bib
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, tidybayes, brms, bayesplot, bayestestR, modelr,faintr)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+# options to increase efficiency of brms models (optional)
+#options(brms.backend = "cmdstanr")
+options(mc.cores = parallel::detectCores())
+
+```
+
+# Exercise
+
+We will be re-analyzing the data from @winter2013making.
+
+```{r}
+#| label: preprocessing_sim
+
+# Load our datasets
+sim <- read_csv("../data/linguistic_similarity.csv") |> 
+  mutate(Sem = as.factor(Sem),
+         Phon = as.factor(Phon))
+sim
+
+```
+
+We will now retrace the original article's complete analysis. In their original analysis, they were interested in whether (a) semantic similarity between cities, (b) phonological similarity between cities, and (c) their interaction affects how close/far apart participants draw the cities.
+
+## (a) Specify Priors
+
+Specify the model formula and appropriate weakly informative priors for all relevant predictors. Contrast-code the predictors.
+
+```{r}
+#| label: model_formula_sim
+
+sim$Phon <- factor(sim$Phon, levels = c("Different", "Similar"))
+sim$Sem  <- factor(sim$Sem,  levels = c("Different", "Similar"))
+
+contrasts(sim$Phon) <- contr.sum(2)
+contrasts(sim$Sem)  <- contr.sum(2)
+
+model_sim <- bf(Distance ~ Phon * Sem)
+
+get_prior(model_sim,sim)
+
+
+my_priors <- c(prior(normal(74, 34), class = "Intercept"),
+              prior(normal(0, 25), class = "b", coef = "Phon1"),
+              prior(normal(0, 25), class = "b", coef = "Sem1"),
+              prior(normal(0, 25), class = "b", coef = "Phon1:Sem1"),
+              prior(normal(0, 34), class = "sigma"))
+
+```
+
+## (b) Run the appropriate model for the research question
+
+```{r}
+#| label: model_sim
+
+mdl_sim <- brm(Distance ~ Phon * Sem,
+                  family = gaussian(),
+                  prior = my_priors,
+                  data = sim,
+                  chains = 4,
+                  cores = 4, 
+                  iter = 2000,
+                  warmup = 1000,
+                  thin = 1,
+                  seed = 72)
+
+```
+
+## (c) Posterior predicive check
+
+Check the overall model fit with posterior predictive checks. If the model does not fit the data well, fix the problem (check `06_homework_solutions.qmd` for inspiration).
+
+```{r}
+#| label: model_fit
+
+pp_check(mdl_sim, ndraws = 100)
+
+#it doesn't fit that well so I'll try to fix it
+
+sim_sqrt <- sim |> 
+  mutate(sqrt_dist = sqrt(Distance))
+
+# some priors
+sqrt_priors <- c(prior(normal(9, 3), class = 'Intercept'),
+              prior(normal(0, 3), class = "b", coef = "Phon1"),
+              prior(normal(0, 3), class = "b", coef = "Sem1"),
+              prior(normal(0, 3), class = "b", coef = "Phon1:Sem1"),
+              prior(normal(0, 3), class = "sigma"))
+
+
+# run new model
+
+sqrt_model <- brm(sqrt_dist ~ Phon * Sem,
+                  family = gaussian(),
+                  prior = sqrt_priors,
+                  data = sim_sqrt,
+                  chains = 4,
+                  cores = 4, 
+                  iter = 2000,
+                  warmup = 1000,
+                  thin = 1,
+                  seed = 72)
+
+# new check
+pp_check(sqrt_model, ndraws = 100)
+
+
+#looks slightly better, fixes the issues at the sides, but the peak is still not great?
+
+
+```
+
+## (d) Assess sampling diagnostics
+
+Check that chains are reasonably mixed and that sampling yielded a sufficient number of effective sample size. If there are issues, address them accordingly.
+
+```{r}
+#| label: sampling_diagnostics
+#old model
+mcmc_plot(mdl_sim, type = "trace")
+#looks good
+
+#new, with a somewhat better fit?
+mcmc_plot(sqrt_model, type = "trace")
+
+#it looks like healthy caterpillars
+
+```
+
+## (e) Interpret the results
+
+Now interpret the model relative to the research question and describe uncertainty, visualize posteriors, calculate posterior probabilities of direction, and calculate Bayes Factors for evidence for and against the posterior coefficients being point zero.
+
+(Note: When you want to extract interaction terms like `b_Sem1:Phon1`, you have to put single quotation marks around them because R struggles with interpreting the colon)
+
+```{r}
+#| label: interpret_sim
+summary(sqrt_model)
+
+
+#generate posteriors
+posteriors = as_draws_df(sqrt_model)
+post_samples_sim <- brms::posterior_samples(sqrt_model)  %>% select(-lp__,-lprior)
+head(post_samples_sim)
+
+#visualizing the posteriors
+post_samples_sim %>% 
+  pivot_longer(cols = everything()) %>% 
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal()
+
+
+#visualizing like we have done previously
+
+draws_model <- spread_draws(sqrt_model, b_Phon1, b_Sem1, `b_Phon1:Sem1`) 
+
+draws_model |>
+  pivot_longer(cols = c(b_Phon1, b_Sem1, `b_Phon1:Sem1`),
+    names_to  = "Parameter",
+    values_to = "Value") |>
+  ggplot(aes(x = Value, fill = Parameter)) +
+    geom_density() +
+    facet_wrap(Parameter~., ncol = 1) +
+  theme_minimal()
+
+
+
+# I want to use faintr package to calculate posterior probabilities of direction, but I can't seem to download it
+# load ’devtools’ package to allow installation from GitHub
+devtools::install_github('michael-franke/bayes_mixed_regression_tutorial/faintr', 
+                         build_vignettes = TRUE)
+library(faintr)
+
+#it says that it is not available for my version of R, so I will need to do something else? 
+
+#then I wanted to use this, but it doesn't seem to be available for this verion of R. I don't really know how to do it then. 
+
+get_posterior_beliefs_about_hypotheses(sqrt_model)
+
+
+
+#calculate Bayes Factor
+
+#probability of direction
+p_direction(sqrt_model)
+#this works
+#Phon1 - 96.55%, Sem1 - 99.72%, Phon1:Sem1 - 65.72%
+
+bayesfactor_parameters(posterior = sqrt_model,
+                       prior = sqrt_priors,
+                       null = 0)
+# It does not work, and I don't know why
+#I might have to transform the logged values
+
+#bayes factor, coeff being zero
+h_all <- hypothesis(
+  sqrt_model,
+  c(
+    "Phon1 = 0",
+    "Sem1 = 0",
+    "Phon1:Sem1 = 0"
+  )
+)
+
+h_all$hypothesis[, c("Hypothesis", "Evid.Ratio")]
+
+#Evid.Ratio is NA, so this doesn't work
+fixef(sqrt_model)
+h_all
+
+
+
+
+```
+
+## (g) Write up your entire analysis:
+
+We fitted a Bayesian model of square distance as a function of semantic and phonetic interaction.
+
+The intercept shows that the square root estimate of the distance of predictors was 8.47.
+
+The difference between phonetically similar and phonetically different words is -0.44 (double the phon coefficient because of sum coding), with CI = \[-0.94, 0.04\]. This shows that it is likely that participants place phonetically similar words closer together on the map than phonetically different words. The CI values show that it is plausible that there is no difference between phonetically similar and different words.
+
+The difference between semantically similar and different words is 0.68, with CI = \[0.20, 1.16\]. Participants are therefore more likely to place semantically different words closer together than semantically similar words. The CI values show that it is unlikely that there is no difference.
+
+The interaction is -0.20 (the coefficient times 4 due to the treatment coding).
+
+This shows that the sem effect is likely to be 0.20 units smaller when phon is similar compared to when phon is different. CI = \[-1.16, 0.76\], meaning that 0 is a likely value.
+
+From the probability of direction, we can see that 96.55% of the draws for phon are negative, meaning that it is likely that phonetically similar words would be places closer together than phonetically similar words. 99.72% of the draws are positive for sem, meaning that it is likely that semantically similar words would be placed further apart than semantically different words. \
+
+## OPTIONAL (h) compare your interpretation to the original findings
+
+YOUR COMPARISON HERE
+
+# References
+
+<!-- References will auto-populate in the refs div below -->
+
+::: {#refs}
+:::
