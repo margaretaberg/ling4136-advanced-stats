@@ -1,0 +1,307 @@
+---
+title: "session09 - exercises"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+bibliography: ../resources/bibliography.bib
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, tidybayes, brms, bayesplot, bayesrules, emmeans)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Introduction
+
+The main **learning goals** of this week's practical parts are:
+
+-   getting an intuition about the gap between verbal hypotheses and formal hypotheses
+
+# The data
+
+In this dataset, we will be analyzing data from @kilpatrick2023random:
+
+In a nutshell, the authors were interested in whether there is a relationship between the form of a word and its meaning by looking at Japanese Pokemon names.
+
+Let's have a look at the data:
+
+```{r}
+#| label: data
+
+# Load in the dataset and already remove irrelevant stuff:
+pokemon <- read_csv('../data/Japanese_Pokemon.csv') |> 
+  select(-`Sum of values`, -Checksum)
+
+# check data set:
+pokemon
+
+```
+
+What you see here are the following variables:
+
+Variables:
+
+`Designation`: source of Pokemon name. Official = the official names of Japanese Pokemon; Elicited = elicited names from naive participants.
+
+`pokemonname`: Pokemon name in Japanese
+
+`Output`: Pokemon name in transcribed form
+
+`Length`: Amount of phones in name
+
+`Evolution`: Evolution stage of Pokemons: 1 = pre-evolution; 2 = post-evolution, NA = do not evolve
+
+`f` = amount of /f/ sounds in name
+
+`T` = amount of /T/ sounds in name
+
+...
+
+and many more different sounds.
+
+Now imagine researchers want to use this data set to *test* the following hypothesis:
+
+*The evolution stage of a Pokemon is reflected in aspects of its Japanese name*
+
+# Exercise
+
+## A: Preregister your analysis
+
+Take the hypothesis and what you know about the data set and its structure to predict a very specific relationship that you can test. You are allowed to look at the dataset, but do not look at concrete relationships that might be a manifestation of the hypothesis.
+
+```{r}
+#| label: hypothesis
+
+# The specific relationship I want to test is whether evolution stage correlates to length. I would suspect that higher evolutions have longer names. I want to start by looking only at the official names, as they are created by the game makers.
+
+```
+
+## B: Run your preregistered analysis
+
+Run the preregistered analysis made in (A) above and interpret your results relative to the hypothesis.
+
+```{r}
+#| label: run analysis
+
+# I will start by filtering the dataset, so that I only look at the relevant data, and adding a value for NA in evolution
+
+poke_length <- pokemon %>% filter(Designation == 'Official') %>%
+  select(Designation:Evolution) %>% drop_na() 
+  
+poke_length <- mutate(poke_length, Evolution = as.factor(Evolution))
+
+
+#thinking about my priors
+poke_formula = bf(Length ~ Evolution)
+
+get_prior(poke_formula, poke_length) 
+
+
+#contrast code
+contrasts(poke_length$Evolution) <- contr.sum(2)
+
+
+# set my priors
+poke_priors <- c(prior(normal(10, 5), class = 'Intercept'),
+               prior(normal(0, 4), class = 'b', coef = 'Evolution1'))
+
+
+# run model
+xmdl_poke <- brm(Length ~ Evolution,
+            family = gaussian(),
+            prior = poke_priors,
+            data = poke_length,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 67)
+
+
+
+#doing a pp check, does not look perfect, but quite good
+
+pp_check(xmdl_poke, ndraws = 100)
+
+
+
+summary(xmdl_poke)
+
+#The results from the model show a different result from what I expected. The model shows that the first evolution is -0.90 in length compared to the final evolution. 
+
+```
+
+## C: Show contradicting results
+
+Now explore the data and find two alternative way to test the research hypothesis that yield convincing results that go in opposite directions based of your findings in (A). Justify all your choices verbally after the fact.
+
+```{r}
+#| label: contra_results
+
+# since the 'NA's or middle evolution is the "neutral" point in this paper, I will include NAs and compare them to the final evolution
+
+poke_contra <- pokemon %>% filter(Designation == 'Official') %>%
+  select(Designation:Evolution) 
+poke_contra <- mutate(poke_contra, Evolution = replace_na(Evolution, 1.5))
+poke_contra <- poke_contra[poke_contra$Evolution != 1, ]
+poke_contra <- mutate(poke_contra, Evolution = as.factor(Evolution))
+
+#contrast code
+contrasts(poke_contra$Evolution) <- contr.sum(2)
+
+
+# run model
+xmdl_poke_contra <- brm(Length ~ Evolution,
+            family = gaussian(),
+            prior = poke_priors,
+            data = poke_contra,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 67)
+
+summary(xmdl_poke_contra)
+
+##the difference is smaller, at -0.32, but still not showing my prediction
+
+#I will do the same, but use 1 and 1.5 evolution(NA)
+poke_contra2 <- pokemon %>% filter(Designation == 'Official') %>%
+  select(Designation:Evolution) 
+poke_contra2 <- mutate(poke_contra2, Evolution = replace_na(Evolution, 1.5))
+poke_contra2 <- poke_contra2[poke_contra2$Evolution != 2, ]
+poke_contra2 <- mutate(poke_contra2, Evolution = as.factor(Evolution))
+contrasts(poke_contra2$Evolution) <- contr.sum(2)
+
+
+# run model
+xmdl_poke_contra2 <- brm(Length ~ Evolution,
+            family = gaussian(),
+            prior = poke_priors,
+            data = poke_contra2,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 67)
+
+summary(xmdl_poke_contra2)
+
+#this doesn't work either
+
+
+#I am trying to use all the data, with both elicited and official names. I will also include all three evolution stages.
+
+pokemon_length <- pokemon %>%
+  select(Designation:Evolution) 
+
+pokemon_length <- mutate(pokemon_length, Evolution = replace_na(Evolution, 1.5))
+
+
+#setting priors
+poke_priors_length <- c(prior(normal(10, 5), class = 'Intercept'),
+               prior(normal(0, 4), class = 'b', coef = 'Evolution'))
+
+
+# run model
+xmdl_pokemon_length <- brm(Length ~ Evolution,
+            family = gaussian(),
+            prior = poke_priors_length,
+            data = pokemon_length,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 67)
+
+summary(xmdl_pokemon_length)
+
+#this model shows that when looking at all the pokemon names, we find that the length increased with the evolution stages
+
+#I am including all the evolution stages, but only using the official names. This is because the elicited do not have a middle stage, so it would be nice to see how the length changes in all stages. 
+
+pokemon_official <- pokemon %>% filter(Designation == 'Official') %>%
+  select(Designation:Evolution) 
+
+pokemon_official <- mutate(pokemon_official, Evolution = replace_na(Evolution, 1.5))
+
+
+#setting priors
+poke_priors_length <- c(prior(normal(10, 5), class = 'Intercept'),
+               prior(normal(0, 4), class = 'b', coef = 'Evolution'))
+
+
+# run model
+xmdl_pokemon_official <- brm(Length ~ Evolution,
+            family = gaussian(),
+            prior = poke_priors_length,
+            data = pokemon_official,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 67)
+
+summary(xmdl_pokemon_official)
+
+#when looking at all the evolutions with the official names, and in all the names, we can see that the evolution stage can indicate an increase in length. 
+
+
+
+```
+
+## D: Researcher degrees of freedom
+
+Note down all dimensions of researcher degrees of freedom that make the mapping of the hypothesis onto your data analysis vague. How many possible combinations can you think of?
+
+```{r}
+#| label: degrees of freedom
+
+# The wording of the hypothesis is extremely vague, which means that if I can find a difference in any of the parameters, I can say that the hypothesis is correct. This includes the different consonants and vowels, which I didn't look at at all, length, and the differences in official and elicited names. 
+# Because of the vague wording of the hypothesis, there is much wiggleroom. It does not specify "evolution" specifically, and the description of the evolutions in the code book seem weird, as the second evolution is NA. "Is reflected" is also extremely vague, because it "reflected" can mean anything in this case. 
+#I think the elicited names also might be slightly problematic, as it introduces other people's intuitions, perhaps more iconic than what the original names in fact are. It could, for instance, be the case that the people participanting have knowledge of the more stereotypical cases, but not neccessarily all of them. (For instance, "Pichu"->"Pikachu", both longer and more open vowels in the second evolution.)
+# There is also a difference of whether I choose to have evolution as a function of x, or x as a function of evolution, which can possibly makke a difference as well. 
+#I have now used the models we have used in class, but I'm sure there are many other ways to do it. I didn't include interactions either, which you abslutely can have many combinations of, which might change the result. 
+#I think it might be too many to write down, but each line of code and each choice you make will be a dimention of researcher degrees of freedom, as there are many oprions you opt out. 
+
+
+
+```
+
+# References
+
+<!-- References will auto-populate in the refs div below -->
+
+::: {#refs}
+:::
