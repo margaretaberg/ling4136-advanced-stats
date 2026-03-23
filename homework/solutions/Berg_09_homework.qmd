@@ -167,58 +167,6 @@ Now explore the data and find two alternative way to test the research hypothesi
 
 # since the 'NA's or middle evolution is the "neutral" point in this paper, I will include NAs and compare them to the final evolution
 
-poke_contra <- pokemon %>% filter(Designation == 'Official') %>%
-  select(Designation:Evolution) 
-poke_contra <- mutate(poke_contra, Evolution = replace_na(Evolution, 1.5))
-poke_contra <- poke_contra[poke_contra$Evolution != 1, ]
-poke_contra <- mutate(poke_contra, Evolution = as.factor(Evolution))
-
-#contrast code
-contrasts(poke_contra$Evolution) <- contr.sum(2)
-
-
-# run model
-xmdl_poke_contra <- brm(Length ~ Evolution,
-            family = gaussian(),
-            prior = poke_priors,
-            data = poke_contra,
-            chains = 4,
-            cores = 4, 
-            iter = 2000,
-            warmup = 1000,
-            thin = 1,
-            seed = 67)
-
-summary(xmdl_poke_contra)
-
-##the difference is smaller, at -0.32, but still not showing my prediction
-
-#I will do the same, but use 1 and 1.5 evolution(NA)
-poke_contra2 <- pokemon %>% filter(Designation == 'Official') %>%
-  select(Designation:Evolution) 
-poke_contra2 <- mutate(poke_contra2, Evolution = replace_na(Evolution, 1.5))
-poke_contra2 <- poke_contra2[poke_contra2$Evolution != 2, ]
-poke_contra2 <- mutate(poke_contra2, Evolution = as.factor(Evolution))
-contrasts(poke_contra2$Evolution) <- contr.sum(2)
-
-
-# run model
-xmdl_poke_contra2 <- brm(Length ~ Evolution,
-            family = gaussian(),
-            prior = poke_priors,
-            data = poke_contra2,
-            chains = 4,
-            cores = 4, 
-            iter = 2000,
-            warmup = 1000,
-            thin = 1,
-            seed = 67)
-
-summary(xmdl_poke_contra2)
-
-#this doesn't work either
-
-
 #I am trying to use all the data, with both elicited and official names. I will also include all three evolution stages.
 
 pokemon_length <- pokemon %>%
